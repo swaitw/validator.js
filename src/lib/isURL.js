@@ -1,4 +1,5 @@
 import assertString from './util/assertString';
+import checkHost from './util/checkHost';
 
 import isFQDN from './isFQDN';
 import isIP from './isIP';
@@ -13,8 +14,10 @@ protocols - valid protocols can be modified with this option
 require_host - if set as false isURL will not check if host is present in the URL
 require_port - if set as true isURL will check if port is present in the URL
 allow_protocol_relative_urls - if set as true protocol relative URLs will be allowed
-validate_length - if set as false isURL will skip string length validation (IE maximum is 2083)
-
+validate_length - if set as false isURL will skip string length validation
+  max_allowed_length will be ignored if this is set as false
+max_allowed_length - if set isURL will not allow URLs longer than max_allowed_length
+  default is 2084 that IE maximum URL length
 */
 
 
@@ -31,23 +34,10 @@ const default_url_options = {
   allow_fragments: true,
   allow_query_components: true,
   validate_length: true,
+  max_allowed_length: 2084,
 };
 
 const wrapped_ipv6 = /^\[([^\]]+)\](?::([0-9]+))?$/;
-
-function isRegExp(obj) {
-  return Object.prototype.toString.call(obj) === '[object RegExp]';
-}
-
-function checkHost(host, matches) {
-  for (let i = 0; i < matches.length; i++) {
-    let match = matches[i];
-    if (host === match || (isRegExp(match) && match.test(host))) {
-      return true;
-    }
-  }
-  return false;
-}
 
 export default function isURL(url, options) {
   assertString(url);
@@ -59,7 +49,7 @@ export default function isURL(url, options) {
   }
   options = merge(options, default_url_options);
 
-  if (options.validate_length && url.length >= 2083) {
+  if (options.validate_length && url.length > options.max_allowed_length) {
     return false;
   }
 
@@ -87,11 +77,11 @@ export default function isURL(url, options) {
     }
   } else if (options.require_protocol) {
     return false;
-  } else if (url.substr(0, 2) === '//') {
+  } else if (url.slice(0, 2) === '//') {
     if (!options.allow_protocol_relative_urls) {
       return false;
     }
-    split[0] = url.substr(2);
+    split[0] = url.slice(2);
   }
   url = split.join('://');
 
@@ -152,6 +142,11 @@ export default function isURL(url, options) {
   if (options.host_whitelist) {
     return checkHost(host, options.host_whitelist);
   }
+
+  if (host === '' && !options.require_host) {
+    return true;
+  }
+
   if (!isIP(host) && !isFQDN(host, options) && (!ipv6 || !isIP(ipv6, 6))) {
     return false;
   }
